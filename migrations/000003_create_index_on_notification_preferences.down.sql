@@ -1,0 +1,1 @@
+DROP INDEX idx_notification_prefs_provider_deleted_active;
