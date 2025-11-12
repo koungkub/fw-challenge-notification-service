@@ -138,8 +138,9 @@ func (s *NotificationService) sendNotification(
 	for _, preference := range preferences {
 		req.SecretKey = preference.SecretKey
 		if err := s.httpclient.Post(ctx, preference.Host, req); err != nil {
-			return nil
+			continue
 		}
+		return nil
 	}
 	return errors.New("failure to sent the notifications")
 }
