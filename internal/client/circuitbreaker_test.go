@@ -9,6 +9,7 @@ import (
 	"github.com/sony/gobreaker/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestNewCircuitBreakerRegistry(t *testing.T) {
@@ -26,6 +27,7 @@ func TestNewCircuitBreakerRegistry(t *testing.T) {
 					MinRequestsBeforeTrip:   3,
 					FailureThresholdPercent: 60,
 				},
+				Logger: zap.NewNop(),
 			},
 			verify: func(t *testing.T, registry *CircuitBreakerRegistry) {
 				assert.NotNil(t, registry)
@@ -44,6 +46,7 @@ func TestNewCircuitBreakerRegistry(t *testing.T) {
 					MinRequestsBeforeTrip:   5,
 					FailureThresholdPercent: 75,
 				},
+				Logger: zap.NewNop(),
 			},
 			verify: func(t *testing.T, registry *CircuitBreakerRegistry) {
 				assert.NotNil(t, registry)
@@ -140,6 +143,7 @@ func TestCircuitBreakerRegistry_ReadyToTrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			params := CircuitBreakerRegistryParams{
 				Config: tt.config,
+				Logger: zap.NewNop(),
 			}
 			registry := NewCircuitBreakerRegistry(params)
 
@@ -158,6 +162,7 @@ func TestCircuitBreakerRegistry_GetOrCreate(t *testing.T) {
 				MinRequestsBeforeTrip:   3,
 				FailureThresholdPercent: 60,
 			},
+			Logger: zap.NewNop(),
 		})
 
 		host := "api.example.com"
@@ -176,6 +181,7 @@ func TestCircuitBreakerRegistry_GetOrCreate(t *testing.T) {
 				MinRequestsBeforeTrip:   3,
 				FailureThresholdPercent: 60,
 			},
+			Logger: zap.NewNop(),
 		})
 
 		host := "api.example.com"
@@ -193,6 +199,7 @@ func TestCircuitBreakerRegistry_GetOrCreate(t *testing.T) {
 				MinRequestsBeforeTrip:   3,
 				FailureThresholdPercent: 60,
 			},
+			Logger: zap.NewNop(),
 		})
 
 		host1 := "api1.example.com"
@@ -216,6 +223,7 @@ func TestCircuitBreakerRegistry_Concurrency(t *testing.T) {
 				MinRequestsBeforeTrip:   3,
 				FailureThresholdPercent: 60,
 			},
+			Logger: zap.NewNop(),
 		})
 
 		host := "api.example.com"
@@ -248,6 +256,7 @@ func TestCircuitBreakerRegistry_Concurrency(t *testing.T) {
 				MinRequestsBeforeTrip:   3,
 				FailureThresholdPercent: 60,
 			},
+			Logger: zap.NewNop(),
 		})
 
 		numGoroutines := 50
@@ -276,6 +285,7 @@ func TestCircuitBreakerRegistry_Integration(t *testing.T) {
 				MinRequestsBeforeTrip:   3,
 				FailureThresholdPercent: 60,
 			},
+			Logger: zap.NewNop(),
 		})
 
 		host := "api.example.com"
@@ -306,6 +316,7 @@ func TestCircuitBreakerRegistry_Integration(t *testing.T) {
 				MinRequestsBeforeTrip:   2,
 				FailureThresholdPercent: 50,
 			},
+			Logger: zap.NewNop(),
 		})
 
 		host := "api.example.com"

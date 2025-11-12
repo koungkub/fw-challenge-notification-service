@@ -7,11 +7,13 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sony/gobreaker/v2"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 type CircuitBreakerRegistry struct {
 	breakers *sync.Map
 	settings gobreaker.Settings
+	logger   *zap.Logger
 }
 
 type CircuitBreakerResponse struct {
@@ -23,6 +25,7 @@ type CircuitBreakerRegistryParams struct {
 	fx.In
 
 	Config CircuitBreakerRegistryConfig
+	Logger *zap.Logger
 }
 
 func NewCircuitBreakerRegistry(params CircuitBreakerRegistryParams) *CircuitBreakerRegistry {
@@ -38,6 +41,7 @@ func NewCircuitBreakerRegistry(params CircuitBreakerRegistryParams) *CircuitBrea
 					failureRatio >= (params.Config.FailureThresholdPercent/100)
 			},
 		},
+		logger: params.Logger,
 	}
 }
 
@@ -57,8 +61,15 @@ func NewCircuitBreakerRegistryConfig() CircuitBreakerRegistryConfig {
 
 func (r *CircuitBreakerRegistry) GetOrCreate(host string) *gobreaker.CircuitBreaker[CircuitBreakerResponse] {
 	if cb, ok := r.breakers.Load(host); ok {
+		r.logger.Debug("reusing existing circuit breaker",
+			zap.String("host", host),
+		)
 		return cb.(*gobreaker.CircuitBreaker[CircuitBreakerResponse])
 	}
+
+	r.logger.Info("creating new circuit breaker",
+		zap.String("host", host),
+	)
 
 	settings := r.settings
 	settings.Name = host
