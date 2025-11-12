@@ -389,3 +389,86 @@ go install go.uber.org/mock/mockgen@latest
 # Generate mocks
 go generate ./...
 ```
+
+## Future Improvements
+
+The following enhancements could further improve the service's performance, scalability, and security:
+
+### 1. Migrate from REST API to gRPC
+
+**Benefits:**
+- **Reduced network traffic**: Protocol Buffers binary serialization is more compact than JSON
+- **Schema-first approach**: Strongly-typed contracts with `.proto` files prevent API mismatches
+- **Built-in code generation**: Auto-generate client/server code for multiple languages
+- **HTTP/2 support**: Multiplexing, server push, and header compression out of the box
+- **Bidirectional streaming**: Enable real-time notification status updates
+
+### 2. Replace In-Memory Cache with Centralized Cache
+
+**Current limitation:** Ristretto in-memory cache doesn't share state across multiple service instances, leading to cache inconsistency in distributed deployments.
+
+**Proposed solution:** Use Redis or Memcached as a centralized cache layer
+
+**Benefits:**
+- **Shared cache state**: All service instances access the same cache
+- **Higher cache hit ratio**: Reduced database load across the cluster
+- **Persistence options**: Redis AOF/RDB for cache durability
+- **Advanced features**: Redis pub/sub for cache invalidation events
+- **Scalability**: Independent cache layer scaling
+
+### 3. Implement Cache Invalidation on Preference Updates
+
+**Current gap:** Cache entries remain stale when notification preferences are added/updated in the database until TTL expires (10 minutes).
+
+**Proposed solution:** Active cache invalidation strategy
+
+**Approaches:**
+
+**Option A: Write-through cache**
+- Update database and cache simultaneously
+- Ensure consistency but requires write access in service layer
+
+**Option B: Event-driven invalidation**
+- Publish events (Redis pub/sub, Kafka) when preferences change
+- Service subscribes to events and invalidates local/remote cache
+- Decoupled from preference management system
+
+**Option C: Database triggers**
+- PostgreSQL triggers on `notification_preferences` table
+- NOTIFY command broadcasts changes
+- Service listens via LISTEN and invalidates cache
+
+**Benefits:**
+- Near real-time preference updates
+- Reduced cache inconsistency window from 10 minutes to milliseconds
+- Better user experience for dynamic preference changes
+
+### 4. Security Hardening: Principle of Least Privilege for Database User
+
+**Current setup:** The application likely uses a database user with broad permissions (CREATE, ALTER, DROP).
+
+**Proposed improvements:**
+
+**A. Separate migration and application users:**
+- Create a dedicated migration user with DDL permissions (CREATE, ALTER, DROP) used exclusively during deployment
+- Create a restricted application user with minimal DML permissions (SELECT, INSERT, UPDATE only)
+- Application user should have NO schema modification capabilities (no DROP, ALTER, CREATE)
+- Grant sequence usage rights to application user for auto-incrementing IDs
+- Store credentials separately in environment-specific secret stores
+
+**B. Read-only replicas for query workload:**
+- Route reads to PostgreSQL replicas
+- Master handles writes only
+- Reduces attack surface if app user is compromised
+
+**C. Additional security measures:**
+- Use connection pooling with `pgbouncer` for connection limits
+- Enable SSL/TLS for database connections (`DB_SSLMODE=require`)
+- Implement database credential rotation
+- Use secret management systems (HashiCorp Vault, AWS Secrets Manager)
+- Enable PostgreSQL audit logging for compliance
+
+**Benefits:**
+- **Reduced blast radius**: Compromised app credentials can't drop tables
+- **Compliance**: Meets security audit requirements for least privilege
+- **Operational safety**: Prevents accidental schema modifications by application code
