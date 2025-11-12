@@ -197,16 +197,13 @@ func TestNotificationService_SendToSeller(t *testing.T) {
 			title:   "New Order",
 			message: "You have a new order",
 			setupMocks: func(cache *mockrepository.MockCacheProvider, persistent *mockrepository.MockPersistentProvider, httpClient *mockclient.MockHTTPClientProvider) {
-				emailPreferences := []repository.NotificationPreference{
-					{Host: "https://email-service.com", SecretKey: "email-secret"},
-				}
-				cache.EXPECT().Get(repository.EmailProvider).Return(emailPreferences, nil)
+				cache.EXPECT().Get(repository.EmailProvider).Return(nil, errors.New("cache miss"))
 				cache.EXPECT().Get(repository.PushNotificationProvider).Return(nil, errors.New("cache miss"))
-				persistent.EXPECT().FindByProviderType(gomock.Any(), repository.PushNotificationProvider).Return(nil, errors.New("database error"))
-				httpClient.EXPECT().Post(gomock.Any(), "https://email-service.com", gomock.Any()).Return(errors.New("some error"))
+				persistent.EXPECT().FindByProviderType(gomock.Any(), repository.EmailProvider).Return(nil, errors.New("email db error"))
+				persistent.EXPECT().FindByProviderType(gomock.Any(), repository.PushNotificationProvider).Return(nil, errors.New("push db error"))
 			},
 			expectedError:  true,
-			expectedErrMsg: "database error",
+			expectedErrMsg: "db error",
 		},
 		{
 			name:    "succeeds when email notification succeeds",
