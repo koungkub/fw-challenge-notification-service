@@ -1,0 +1,46 @@
+services:
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.example
+    ports:
+      - 8080:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+  postgres:
+    image: postgres:18.0-trixie
+    restart: unless-stopped
+    healthcheck:
+      test: [ 'CMD', 'pg_isready', '-U', 'myuser' ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=postgres
+  mockserver:
+    image: kennethreitz/httpbin
+    ports:
+      - 9090:80
+      - 9091:80
+      - 9092:80
+      - 9093:80
+  dbmigration:
+    image: migrate/migrate:v4.19.0
+    volumes:
+      - ./migrations:/migrations
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://myuser:mypassword@postgres:5432/postgres?sslmode=disable",
+      "up"
+    ]
+    depends_on:
+      postgres:
+        condition: service_healthy
