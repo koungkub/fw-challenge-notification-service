@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/koungkub/fw-challenge-notification-service/internal/metrics"
 	"go.uber.org/fx"
 )
 
@@ -24,6 +25,7 @@ var _ HTTPClientProvider = (*HTTPClient)(nil)
 type HTTPClient struct {
 	httpclient             *http.Client
 	circuitBreakerRegistry *CircuitBreakerRegistry
+	metricsCollector       *metrics.HTTPClientCollector
 }
 
 type HTTPClientConfig struct {
@@ -35,6 +37,7 @@ type HTTPClientParams struct {
 
 	Config                 HTTPClientConfig
 	CircuitBreakerRegistry *CircuitBreakerRegistry
+	MetricsCollector       *metrics.HTTPClientCollector
 }
 
 func NewHTTPClient(params HTTPClientParams) *HTTPClient {
@@ -43,6 +46,7 @@ func NewHTTPClient(params HTTPClientParams) *HTTPClient {
 			Timeout: params.Config.Timeout,
 		},
 		circuitBreakerRegistry: params.CircuitBreakerRegistry,
+		metricsCollector:       params.MetricsCollector,
 	}
 }
 
@@ -54,6 +58,7 @@ func NewHTTPClientConfig() HTTPClientConfig {
 }
 
 func (c *HTTPClient) Post(ctx context.Context, u string, reqBody NotificationRequest) error {
+	start := time.Now()
 	host, err := extractHost(u)
 	if err != nil {
 		return err
@@ -61,9 +66,12 @@ func (c *HTTPClient) Post(ctx context.Context, u string, reqBody NotificationReq
 
 	circuitBreaker := c.circuitBreakerRegistry.GetOrCreate(host)
 
+	cbState := circuitBreaker.State().String()
+	c.metricsCollector.RecordCircuitBreakerState(ctx, host, cbState)
+
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
-
+		return err
 	}
 
 	req, err := http.NewRequestWithContext(
@@ -93,13 +101,26 @@ func (c *HTTPClient) Post(ctx context.Context, u string, reqBody NotificationReq
 			StatusCode: resp.StatusCode,
 		}, nil
 	})
+
+	duration := time.Since(start)
+	statusCode := 0
+	var finalErr error
+
 	if err != nil {
+		finalErr = err
+		c.metricsCollector.RecordRequest(ctx, http.MethodPost, host, statusCode, duration, finalErr)
 		return err
 	}
 
+	statusCode = resp.StatusCode
 	if resp.StatusCode != http.StatusOK {
-		return errors.New("response status code not equal 200")
+		finalErr = errors.New("response status code not equal 200")
+		c.metricsCollector.RecordRequest(ctx, http.MethodPost, host, statusCode, duration, finalErr)
+		return finalErr
 	}
+
+	// Record successful request
+	c.metricsCollector.RecordRequest(ctx, http.MethodPost, host, statusCode, duration, nil)
 
 	return nil
 }
