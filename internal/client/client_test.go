@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.uber.org/zap"
 )
 
 func TestNewHTTPClient(t *testing.T) {
@@ -25,6 +26,7 @@ func TestNewHTTPClient(t *testing.T) {
 			MinRequestsBeforeTrip:   3,
 			FailureThresholdPercent: 60,
 		},
+		Logger: zap.NewNop(),
 	})
 
 	params := HTTPClientParams{
@@ -33,6 +35,7 @@ func TestNewHTTPClient(t *testing.T) {
 		},
 		CircuitBreakerRegistry: cbRegistry,
 		MetricsCollector:       metricsCollector,
+		Logger:                 zap.NewNop(),
 	}
 
 	client := NewHTTPClient(params)
@@ -75,8 +78,10 @@ func TestHTTPClient_Post_Success(t *testing.T) {
 		Config: NewHTTPClientConfig(),
 		CircuitBreakerRegistry: NewCircuitBreakerRegistry(CircuitBreakerRegistryParams{
 			Config: NewCircuitBreakerRegistryConfig(),
+			Logger: zap.NewNop(),
 		}),
 		MetricsCollector: metricsCollector,
+		Logger:           zap.NewNop(),
 	})
 
 	ctx := context.Background()
@@ -112,8 +117,10 @@ func TestHTTPClient_Post_NonOKStatus(t *testing.T) {
 				Config: NewHTTPClientConfig(),
 				CircuitBreakerRegistry: NewCircuitBreakerRegistry(CircuitBreakerRegistryParams{
 					Config: NewCircuitBreakerRegistryConfig(),
+					Logger: zap.NewNop(),
 				}),
 				MetricsCollector: metricsCollector,
+				Logger:           zap.NewNop(),
 			})
 
 			ctx := context.Background()
@@ -135,8 +142,10 @@ func TestHTTPClient_Post_InvalidURL(t *testing.T) {
 		Config: NewHTTPClientConfig(),
 		CircuitBreakerRegistry: NewCircuitBreakerRegistry(CircuitBreakerRegistryParams{
 			Config: NewCircuitBreakerRegistryConfig(),
+			Logger: zap.NewNop(),
 		}),
 		MetricsCollector: metricsCollector,
+		Logger:           zap.NewNop(),
 	})
 
 	ctx := context.Background()
@@ -161,8 +170,10 @@ func TestHTTPClient_Post_ContextCancellation(t *testing.T) {
 		Config: NewHTTPClientConfig(),
 		CircuitBreakerRegistry: NewCircuitBreakerRegistry(CircuitBreakerRegistryParams{
 			Config: NewCircuitBreakerRegistryConfig(),
+			Logger: zap.NewNop(),
 		}),
 		MetricsCollector: metricsCollector,
+		Logger:           zap.NewNop(),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -256,6 +267,7 @@ func TestHTTPClient_WithMetrics_SuccessfulRequest(t *testing.T) {
 			MinRequestsBeforeTrip:   3,
 			FailureThresholdPercent: 60,
 		},
+		Logger: zap.NewNop(),
 	})
 
 	client := &HTTPClient{
@@ -264,6 +276,7 @@ func TestHTTPClient_WithMetrics_SuccessfulRequest(t *testing.T) {
 		},
 		circuitBreakerRegistry: cbRegistry,
 		metricsCollector:       collector,
+		logger:                 zap.NewNop(),
 	}
 
 	// Make request
@@ -335,6 +348,7 @@ func TestHTTPClient_WithMetrics_FailedRequest(t *testing.T) {
 			MinRequestsBeforeTrip:   3,
 			FailureThresholdPercent: 60,
 		},
+		Logger: zap.NewNop(),
 	})
 
 	client := &HTTPClient{
@@ -343,6 +357,7 @@ func TestHTTPClient_WithMetrics_FailedRequest(t *testing.T) {
 		},
 		circuitBreakerRegistry: cbRegistry,
 		metricsCollector:       collector,
+		logger:                 zap.NewNop(),
 	}
 
 	// Make request
@@ -415,6 +430,7 @@ func TestHTTPClient_WithMetrics_CircuitBreakerState(t *testing.T) {
 			MinRequestsBeforeTrip:   2,
 			FailureThresholdPercent: 50,
 		},
+		Logger: zap.NewNop(),
 	})
 
 	client := &HTTPClient{
@@ -423,6 +439,7 @@ func TestHTTPClient_WithMetrics_CircuitBreakerState(t *testing.T) {
 		},
 		circuitBreakerRegistry: cbRegistry,
 		metricsCollector:       collector,
+		logger:                 zap.NewNop(),
 	}
 
 	ctx := context.Background()
@@ -473,6 +490,7 @@ func TestHTTPClient_WithNoopMetrics(t *testing.T) {
 			MinRequestsBeforeTrip:   3,
 			FailureThresholdPercent: 60,
 		},
+		Logger: zap.NewNop(),
 	})
 
 	metricsCollector, err := metrics.NewHTTPClientCollector(nil)
@@ -484,6 +502,7 @@ func TestHTTPClient_WithNoopMetrics(t *testing.T) {
 		},
 		circuitBreakerRegistry: cbRegistry,
 		metricsCollector:       metricsCollector,
+		logger:                 zap.NewNop(),
 	}
 
 	// Make request - should not panic
@@ -528,6 +547,7 @@ func TestHTTPClient_MultipleRequests_Metrics(t *testing.T) {
 			MinRequestsBeforeTrip:   10, // High threshold to avoid tripping
 			FailureThresholdPercent: 90,
 		},
+		Logger: zap.NewNop(),
 	})
 
 	client := &HTTPClient{
@@ -536,6 +556,7 @@ func TestHTTPClient_MultipleRequests_Metrics(t *testing.T) {
 		},
 		circuitBreakerRegistry: cbRegistry,
 		metricsCollector:       collector,
+		logger:                 zap.NewNop(),
 	}
 
 	ctx := context.Background()

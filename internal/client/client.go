@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/koungkub/fw-challenge-notification-service/internal/metrics"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 //go:generate mockgen -package mockclient -destination ./mock/mockclient.go . HTTPClientProvider
@@ -26,6 +27,7 @@ type HTTPClient struct {
 	httpclient             *http.Client
 	circuitBreakerRegistry *CircuitBreakerRegistry
 	metricsCollector       *metrics.HTTPClientCollector
+	logger                 *zap.Logger
 }
 
 type HTTPClientConfig struct {
@@ -38,6 +40,7 @@ type HTTPClientParams struct {
 	Config                 HTTPClientConfig
 	CircuitBreakerRegistry *CircuitBreakerRegistry
 	MetricsCollector       *metrics.HTTPClientCollector
+	Logger                 *zap.Logger
 }
 
 func NewHTTPClient(params HTTPClientParams) *HTTPClient {
@@ -47,6 +50,7 @@ func NewHTTPClient(params HTTPClientParams) *HTTPClient {
 		},
 		circuitBreakerRegistry: params.CircuitBreakerRegistry,
 		metricsCollector:       params.MetricsCollector,
+		logger:                 params.Logger,
 	}
 }
 
@@ -59,8 +63,13 @@ func NewHTTPClientConfig() HTTPClientConfig {
 
 func (c *HTTPClient) Post(ctx context.Context, u string, reqBody NotificationRequest) error {
 	start := time.Now()
+
 	host, err := extractHost(u)
 	if err != nil {
+		c.logger.Error("failed to extract host from URL",
+			zap.String("url", u),
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -69,8 +78,17 @@ func (c *HTTPClient) Post(ctx context.Context, u string, reqBody NotificationReq
 	cbState := circuitBreaker.State().String()
 	c.metricsCollector.RecordCircuitBreakerState(ctx, host, cbState)
 
+	c.logger.Debug("circuit breaker state checked",
+		zap.String("host", host),
+		zap.String("state", cbState),
+	)
+
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
+		c.logger.Error("failed to marshal request body",
+			zap.String("host", host),
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -81,18 +99,31 @@ func (c *HTTPClient) Post(ctx context.Context, u string, reqBody NotificationReq
 		bytes.NewBuffer(jsonBody),
 	)
 	if err != nil {
+		c.logger.Error("failed to create HTTP request",
+			zap.String("host", host),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	resp, err := circuitBreaker.Execute(func() (CircuitBreakerResponse, error) {
 		resp, err := c.httpclient.Do(req)
 		if err != nil {
+			c.logger.Warn("HTTP request failed",
+				zap.String("host", host),
+				zap.Error(err),
+			)
 			return CircuitBreakerResponse{}, err
 		}
 		defer resp.Body.Close()
 
 		rawBody, err := io.ReadAll(resp.Body)
 		if err != nil {
+			c.logger.Error("failed to read response body",
+				zap.String("host", host),
+				zap.Int("status_code", resp.StatusCode),
+				zap.Error(err),
+			)
 			return CircuitBreakerResponse{}, err
 		}
 
@@ -109,6 +140,11 @@ func (c *HTTPClient) Post(ctx context.Context, u string, reqBody NotificationReq
 	if err != nil {
 		finalErr = err
 		c.metricsCollector.RecordRequest(ctx, http.MethodPost, host, statusCode, duration, finalErr)
+		c.logger.Error("circuit breaker execution failed",
+			zap.String("host", host),
+			zap.Duration("duration", duration),
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -116,10 +152,14 @@ func (c *HTTPClient) Post(ctx context.Context, u string, reqBody NotificationReq
 	if resp.StatusCode != http.StatusOK {
 		finalErr = errors.New("response status code not equal 200")
 		c.metricsCollector.RecordRequest(ctx, http.MethodPost, host, statusCode, duration, finalErr)
+		c.logger.Warn("received non-200 status code",
+			zap.String("host", host),
+			zap.Int("status_code", statusCode),
+			zap.Duration("duration", duration),
+		)
 		return finalErr
 	}
 
-	// Record successful request
 	c.metricsCollector.RecordRequest(ctx, http.MethodPost, host, statusCode, duration, nil)
 
 	return nil
