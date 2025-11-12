@@ -7,7 +7,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o server ./cmd/api/
 
-# --
+# Final stage
 FROM debian:trixie-slim
 
 RUN useradd -m appuser
@@ -18,4 +18,4 @@ RUN chown appuser:appuser /opt/bin/server
 USER appuser
 
 EXPOSE 8080
-ENTRYPOINT ["/usr/opt/bin/server"]
+ENTRYPOINT ["/opt/bin/server"]
