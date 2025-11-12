@@ -9,10 +9,13 @@ var Module = fx.Module("metric",
 		NewMetricConfig,
 	),
 	httpCollectorModule,
+	httpclientCollectorModule,
 )
 
-var (
-	httpCollectorModule = fx.Provide(
-		NewHTTPServerCollector,
-	)
+var httpCollectorModule = fx.Provide(
+	NewHTTPServerCollector,
+)
+
+var httpclientCollectorModule = fx.Provide(
+	NewHTTPClientCollector,
 )
