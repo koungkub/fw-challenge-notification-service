@@ -17,6 +17,7 @@
 - [Metrics & Observability](#metrics--observability)
 - [Development](#development)
 - [Testing](#testing)
+- [Future Improvements](#future-improvements)
 
 ## Overview
 
@@ -229,6 +230,10 @@ Prometheus-compatible metrics endpoint. Returns metrics in Prometheus exposition
 
 All configuration is done via environment variables. The service uses `.env.example` as a template.
 
+### Application
+- `APP_NAME` - Application name for logging and metrics (default: `notification-service`)
+- `GIN_MODE` - Gin framework mode: `debug`, `release`, or `test` (default: `debug`)
+
 ### HTTP Server
 - `HTTP_SERVER_PORT` - Server port (default: `8080`)
 
@@ -264,19 +269,19 @@ The service uses PostgreSQL with the following schema:
 ```sql
 CREATE TYPE notification_provider_type AS ENUM ('Email', 'PushNotification');
 
-CREATE TABLE notification_preferences (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS notification_preferences (
+    id BIGSERIAL PRIMARY KEY,
     provider_type notification_provider_type NOT NULL,
-    provider_name VARCHAR(255) NOT NULL,
-    host VARCHAR(255) NOT NULL,
-    priority INTEGER NOT NULL,
-    secret_key VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMP
+    provider_name TEXT NOT NULL,
+    host TEXT NOT NULL,
+    priority INT DEFAULT 0,
+    secret_key TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_notification_preferences_provider_priority
-ON notification_preferences(provider_type, priority)
+CREATE INDEX idx_notification_prefs_provider_deleted_active
+ON notification_preferences (provider_type, priority)
 WHERE deleted_at IS NULL;
 ```
 
