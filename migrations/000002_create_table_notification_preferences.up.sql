@@ -5,6 +5,6 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
     host TEXT NOT NULL,
     priority INT DEFAULT 0,
     secret_key TEXT,
-    created_at timestamptz,
-    deleted_at timestamptz
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ
 );
