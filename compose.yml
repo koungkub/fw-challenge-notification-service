@@ -1,4 +1,16 @@
 services:
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.example
+    ports:
+      - 8080:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
   postgres:
     image: postgres:18.0-trixie
     restart: unless-stopped
@@ -29,3 +41,6 @@ services:
       "-database", "postgres://myuser:mypassword@postgres:5432/postgres?sslmode=disable",
       "up"
     ]
+    depends_on:
+      postgres:
+        condition: service_healthy
