@@ -6,6 +6,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -18,13 +19,15 @@ type PersistentProvider interface {
 var _ PersistentProvider = (*Persistent)(nil)
 
 type Persistent struct {
-	conn *gorm.DB
+	conn   *gorm.DB
+	logger *zap.Logger
 }
 
 type PersistentParams struct {
 	fx.In
 
 	Config PersistentConfig
+	Logger *zap.Logger
 }
 
 func NewPersistent(lc fx.Lifecycle, params PersistentParams) (*Persistent, error) {
@@ -50,7 +53,8 @@ func NewPersistent(lc fx.Lifecycle, params PersistentParams) (*Persistent, error
 	})
 
 	return &Persistent{
-		conn: conn,
+		conn:   conn,
+		logger: params.Logger,
 	}, nil
 }
 
@@ -78,9 +82,16 @@ func (p *Persistent) FindByProviderType(ctx context.Context, provider Notificati
 		Order("priority").
 		Find(ctx)
 	if err != nil {
+		p.logger.Error("database query failed",
+			zap.String("provider_type", provider.String()),
+			zap.Error(err),
+		)
 		return []NotificationPreference{}, err
 	}
 	if len(preferences) == 0 {
+		p.logger.Warn("no preferences found for provider type",
+			zap.String("provider_type", provider.String()),
+		)
 		return []NotificationPreference{}, gorm.ErrRecordNotFound
 	}
 

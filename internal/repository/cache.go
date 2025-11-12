@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/ristretto/v2"
 	"github.com/kelseyhightower/envconfig"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 const (
@@ -25,12 +26,14 @@ var _ CacheProvider = (*Cache)(nil)
 type Cache struct {
 	engine      *ristretto.Cache[string, []NotificationPreference]
 	expiredTime time.Duration
+	logger      *zap.Logger
 }
 
 type CacheParams struct {
 	fx.In
 
 	Config CacheConfig
+	Logger *zap.Logger
 }
 
 func NewCache(lc fx.Lifecycle, params CacheParams) (*Cache, error) {
@@ -51,7 +54,9 @@ func NewCache(lc fx.Lifecycle, params CacheParams) (*Cache, error) {
 	})
 
 	return &Cache{
-		engine: engine,
+		engine:      engine,
+		expiredTime: params.Config.ExpiredTime,
+		logger:      params.Logger,
 	}, nil
 }
 
@@ -74,8 +79,17 @@ func (c *Cache) Get(key NotificationProvider) ([]NotificationPreference, error) 
 
 	value, found := c.engine.Get(cacheKey)
 	if !found {
+		c.logger.Debug("cache miss",
+			zap.String("provider_type", key.String()),
+			zap.String("cache_key", cacheKey),
+		)
 		return nil, fmt.Errorf("cache key: '%s' not found", cacheKey)
 	}
+
+	c.logger.Debug("cache hit",
+		zap.String("provider_type", key.String()),
+		zap.Int("preferences_count", len(value)),
+	)
 	return value, nil
 }
 
@@ -83,5 +97,11 @@ func (c *Cache) Set(key NotificationProvider, values []NotificationPreference) e
 	cacheKey := fmt.Sprintf(cacheKeyPattern, key.String())
 
 	c.engine.SetWithTTL(cacheKey, values, 1, c.expiredTime)
+
+	c.logger.Debug("cache set",
+		zap.String("provider_type", key.String()),
+		zap.Int("preferences_count", len(values)),
+		zap.Duration("ttl", c.expiredTime),
+	)
 	return nil
 }
